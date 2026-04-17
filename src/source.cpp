@@ -14,6 +14,7 @@ int main() {
 
     cout << "\n";
     Parser parser;
-    parser.Configure("test/example.json");
+    parser.Configure("test/configs/example.json");
+    parser.Run("test/sensor_data/");
     return 0;
 }

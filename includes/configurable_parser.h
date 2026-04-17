@@ -6,6 +6,8 @@
 #include <iostream>
 #include <fstream>
 #include <json.hpp>
+#include <filesystem>
+
 using json = nlohmann::json;
 
 // TODO: добавить всякие проверки в Parser::Configure
@@ -86,22 +88,38 @@ private:
     Config config_;
     std::vector<FileData> files_data_;
 
-    FileData ParseFile(const std::string& path_to_file) {
+    FileData ParseFile(const std::filesystem::path& path_to_file) {
 
     }
-    void Parse() { // заполняет files_data
-        
+    void Parse(const std::string& path_to_files) { // заполняет files_data
+        // тут можно сделать проверку, что есть хотя бы один файл для парсинга
+        // ещё сюда можно добавить параллельности
+        std::filesystem::path test{path_to_files};
+        for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
+            if (dir_entry.is_regular_file()) {
+                std::filesystem::path file_path = dir_entry.path();
+                if (file_path.extension() == ".txt") {
+                    ParseFile(file_path);
+                }
+            }
+        }
     }
     void Analyze() {
 
     }
 
 public:
-    bool Configure(const std::string& path_to_config_file) { // заполняет config_
+    /// @brief configures parser based on config file
+    /// @param path_to_config_file путь до файла конфигурации
+    /// @return false если открыть файл не удалось, иначе true
+    bool Configure(const std::string& path_to_config_file) {
         // сначала очищаем config_
         config_.clear();
 
         std::ifstream f(path_to_config_file);
+        if (!f.is_open()) {
+            return false;
+        }
 
         json data = json::parse(f);
 
@@ -136,8 +154,11 @@ public:
         return true;
     }
 
-    void Run(std::string path_to_files, std::ostream& os = std::cout) { // тут запускается Parse, затем Analyze
-        Parse();
+    /// @brief Запускает парсер. Перед запуском необходимо настроить парсер с помощью `configure()`
+    /// @param path_to_files путь до директории, содержащей файлы для обработки. Обрабатываются все файлы формата *.txt из директории
+    /// @param os поток для вывода результата анализа
+    void Run(std::string path_to_files, std::ostream& os = std::cout) {
+        Parse(path_to_files);
         Analyze();
     }
 };
