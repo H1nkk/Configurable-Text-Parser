@@ -1,19 +1,19 @@
 #include "../includes/json.hpp"
+#include "configurable_parser.h"
 #include <iostream>
 #include <fstream>
 #include <windows.h>
 
 using json = nlohmann::json;
 
+using namespace std;
+
 int main() {
     SetConsoleOutputCP(CP_UTF8); 
     SetConsoleCP(CP_UTF8);  
 
-    std::ifstream f("test/example.json");
-    std::cout << f.is_open()<<'\n';
-    
-    json data = json::parse(f);
-    std::cout << data.dump() << "\n####\n";
-    std::cout << "hedыыыыыы";
+    cout << "\n";
+    Parser parser;
+    parser.Configure("test/example.json");
     return 0;
 }

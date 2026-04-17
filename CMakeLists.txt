@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.30)
 project(ConfigurableTextParser VERSION 1.0.0 LANGUAGES CXX)
 
 # Устанавливаем стандарт C++
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -18,6 +18,7 @@ set(INCLUDES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/includes)
 # Создаем исполняемый файл из исходников
 add_executable(${PROJECT_NAME} 
     src/source.cpp
+    src/configurable_parser.cpp
 )
 
 set(CMAKE_CXX_MODULE_STD ON)
@@ -34,11 +35,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # Опционально: включаем предупреждения компилятора
-if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
-else()
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+#if(MSVC)
+#    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+#else()
+#    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+#endif()
 
 # Выводим информацию о путях (полезно для отладки)
 message(STATUS "Project: ${PROJECT_NAME}")
