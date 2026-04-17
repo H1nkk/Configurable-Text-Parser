@@ -28,7 +28,8 @@ private:
 
     struct FileData {
         std::string file_name_;
-        std::vector<SensorData>  sensors_;
+        std::vector<SensorData> sensors_;
+
     };
 
     class Rule {
@@ -89,7 +90,31 @@ private:
     std::vector<FileData> files_data_;
 
     FileData ParseFile(const std::filesystem::path& path_to_file) {
+        // TODO переделать составление result (заменить на конструктор)
+        std::string file_name = path_to_file.filename().string();
+        std::ifstream data_file_ifstream(path_to_file);
+        if (!data_file_ifstream.is_open()) {
+            throw "Couldn't open " + path_to_file.string() + " file."; // TODO обернуть в красивый тип исключения
+        }
 
+        std::string line;
+        
+        while (std::getline(data_file_ifstream, line)) {
+            // убираем ведущие и последние незначащие пробелы
+            try {
+                line = line.substr(line.find_first_not_of(" \t\n\r"), line.find_last_not_of(" \t\n\r"));
+            }
+            catch (std::exception &e) {
+                // TODO если мы здесь, значит line == "". надо делать просто скип
+                std::cout << e.what();
+            }
+            std::cout << "line: " << line << '\n';
+
+        }
+
+        FileData result;
+        result.file_name_ = file_name;
+        return result;
     }
     void Parse(const std::string& path_to_files) { // заполняет files_data
         // тут можно сделать проверку, что есть хотя бы один файл для парсинга
@@ -99,7 +124,7 @@ private:
             if (dir_entry.is_regular_file()) {
                 std::filesystem::path file_path = dir_entry.path();
                 if (file_path.extension() == ".txt") {
-                    ParseFile(file_path);
+                    files_data_.push_back(ParseFile(file_path));
                 }
             }
         }
@@ -116,12 +141,12 @@ public:
         // сначала очищаем config_
         config_.clear();
 
-        std::ifstream f(path_to_config_file);
-        if (!f.is_open()) {
+        std::ifstream config_file_ifstream(path_to_config_file);
+        if (!config_file_ifstream.is_open()) {
             return false;
         }
 
-        json data = json::parse(f);
+        json data = json::parse(config_file_ifstream);
 
         for (auto& sensor : data["sensors"]) {
             std::cout << sensor["rule"] << ": " << sensor["name"] << '\n';
