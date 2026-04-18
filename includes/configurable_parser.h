@@ -89,10 +89,10 @@ private:
             }
         }
 
-        void Dump(std::ostream& os = std::cout, const std::string& indent = "    ") const {
-            os << indent << "infile_sensor_name_: " << infile_sensor_name_ << '\n';
-            os << indent << "output_sensor_name_: " << output_sensor_name_ << '\n';
-            os << indent << "property_to_value_:\n";
+        void Dump(std::ostream& os = std::cout, const std::string& indent = "  ") const {
+            os << "infile_sensor_name_: " << infile_sensor_name_ << '\n';
+            os << "output_sensor_name_: " << output_sensor_name_ << '\n';
+            os << "property_to_value_:\n";
             
             for (const auto& [key, value] : property_to_value_) {
                 os << indent << "    " << key << ": ";
@@ -120,6 +120,20 @@ private:
         std::vector<SensorData> sensors_;
 
         FileData(std::string&& file_name = "", std::vector<SensorData>&& sensors = {}) : file_name_(file_name), sensors_(sensors) {} 
+
+        void Dump(std::ostream& os = std::cout,  const std::string& indent = "  ") const {
+            os << "file_name_: " << file_name_ << '\n';
+            os << "sensors_:\n";
+            
+            if (sensors_.empty()) {
+                os << indent << "(empty)\n";
+            } else {
+                for (size_t i = 0; i < sensors_.size(); ++i) {
+                    os << indent << "sensor[" << i << "]:\n";
+                    sensors_[i].Dump(os, "    ");
+                }
+            }
+        }
     };
 
 
@@ -140,24 +154,24 @@ private:
             extractors_.clear();
         }
 
-        void Dump(std::ostream& os) {
+        void Dump(std::ostream& os,  const std::string& indent = "  ") const {
             os << "sensors_rule_to_name_:\n";
             for (auto& [key, value] : sensors_rule_to_name_) {
-                os << "  " << key << ": " << value << '\n';
+                os << indent << key << ": " << value << '\n';
             }
 
             os << "rules_:\n";
             for (auto& [key, rule] : rules_) {
-                os << "  " << key << ":\n";
+                os << indent << key << ":\n";
                 os << rule;
             }
 
             os << "extractors_:\n";
             for (auto& extractor : extractors_) {
                 
-                os << "  " << extractor.name_ << ":\n";
+                os << indent << extractor.name_ << ":\n";
                 for (auto& rule_to_extract : extractor.rules_to_extract_) {
-                    os << "    " << rule_to_extract << "\n";
+                    os << indent << indent << rule_to_extract << "\n";
                 }
             }
         }
@@ -208,7 +222,13 @@ private:
             // проверяем, не начался ли другой датчик
             if (config_.sensors_rule_to_name_.find(line.substr(0, line.size() - 1)) != config_.sensors_rule_to_name_.end()) {
                 // line - имя датчика
-                current_infile_sensor_name = line;
+                std::string sensor_name = line;
+
+                if (!sensor_name.empty() && sensor_name.back() == ':') {
+                    sensor_name.pop_back();
+                }
+
+                current_infile_sensor_name = sensor_name;
                 is_sensor_seen = false;
                 continue;
             }
@@ -238,6 +258,7 @@ private:
                         SensorData sensor_data;
                         sensor_data.infile_sensor_name_ = current_infile_sensor_name;
                         sensor_data.output_sensor_name_ = config_.sensors_rule_to_name_[current_infile_sensor_name];
+                        std::cout << "## " << current_infile_sensor_name << ":::" << sensor_data.output_sensor_name_ << '\n';
 
                         std::string rule_type = rule["type"];
                         sensor_data.AddPropertyValue(rule_type, rule_name, match, rule);
