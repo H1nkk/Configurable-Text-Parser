@@ -7,10 +7,13 @@
 #include <fstream>
 #include <json.hpp>
 #include <filesystem>
+#include <regex>
 
 using json = nlohmann::json;
 
 // TODO: добавить всякие проверки в Parser::Configure
+// TODO: заменить map на unordered_map где нужно
+// TODO: сделать проверку что нет rule с одинаковым именем в json-файле
 
 class Parser {
 private:
@@ -19,25 +22,30 @@ private:
         kFloat = 1,
         kUnsignedLL = 2
     };
-
-    struct SensorData {
-        std::string infile_sensor_name_;
-        std::string output_sensor_name_;
-        std::map<std::string, std::variant<bool, float, unsigned long long>> property_to_value_;
+    
+    struct SpeedValue {
+        float value;
+        std::string unit;
+        float value_in_mbit;
+        SpeedValue(float v, const std::string& u) : value(v), unit(u) {
+        if (unit == "Kbit") value_in_mbit = value / 1000.0f;
+        else if (unit == "Mbit") value_in_mbit = value;
+        else if (unit == "Gbit") value_in_mbit = value * 1000.0f;
+        else if (unit == "Tbit") value_in_mbit = value * 1000000.0f;
+        else if (unit == "Pbit") value_in_mbit = value * 1000000000.0f;
+        else if (unit == "bit") value_in_mbit = value / 1000000.0f;
+        else value_in_mbit = value;
+    }
     };
 
-    struct FileData {
-        std::string file_name_;
-        std::vector<SensorData> sensors_;
-
-    };
-
-    class Rule {
+    struct Rule {
         std::map<std::string, std::string> properties_;
-    public:
-        std::string& operator[](std::string propetry_name) {
+
+        // TODO посмотреть: раньше это было в public, а properties_ - в private. странное решение 
+        std::string& operator[](const std::string& propetry_name) {
             return properties_[propetry_name];
         }
+
 
         friend std::ostream& operator<<(std::ostream& os, const Rule& rule) {
             for (auto& [key, value] : rule.properties_) {
@@ -46,6 +54,50 @@ private:
             return os;
         }
     };
+
+    struct SensorData {
+        std::string infile_sensor_name_;
+        std::string output_sensor_name_;
+        std::map<std::string, std::variant<bool, float, SpeedValue>> property_to_value_;
+
+        void AddPropertyValue(const std::string& rule_type, const std::smatch& match, Rule& rule) {
+            std::string rule_name = rule["name"];
+            if (rule_type == "bool") {
+                if (match[1] == rule["true"]) {
+                    property_to_value_[rule_name] = true;
+                } else { 
+                    // тут (match[1] == rule["false"])
+                    property_to_value_[rule_name] = false;
+                }
+            } else if (rule_type == "value") {
+                property_to_value_[rule_name] = std::stof(match[1]);
+            } else if (rule_type == "speed") {
+                if (match.size() >= 3) {
+                    try {
+                        float value = std::stof(match[1].str());
+                        std::string unit = match[2].str();
+                        
+                        // создаем SpeedValue и кладём в variant
+                        SpeedValue speed(value, unit);
+                        property_to_value_[rule_name] = speed;
+                        
+                        std::cout << "  Скорость: " << speed.value << " " << speed.unit 
+                                << " (" << speed.value_in_mbit << " Mbit/s)" << std::endl;
+                    } catch (const std::exception& e) {
+                        std::cerr << "Ошибка парсинга скорости: " << e.what() << std::endl;
+                    }
+                }
+            }
+        }
+    };
+
+    struct FileData {
+        std::string file_name_;
+        std::vector<SensorData> sensors_;
+
+    };
+
+
 
     struct Extractor {
         std::string name_;
@@ -87,7 +139,10 @@ private:
     };
     
     Config config_;
-    std::vector<FileData> files_data_;
+    std::vector<FileData> file_data_list_;
+    const std::vector<std::string> data_rates_list_ {
+        "bit", "Kbit", "Mbit", "Gbit", "Tbit", "Pbit"
+    };
 
     FileData ParseFile(const std::filesystem::path& path_to_file) {
         // TODO переделать составление result (заменить на конструктор)
@@ -97,9 +152,19 @@ private:
             throw "Couldn't open " + path_to_file.string() + " file."; // TODO обернуть в красивый тип исключения
         }
 
-        std::string line;
-        
+        std::string line = "";
+        std::string current_infile_sensor_name = "";
+        bool is_sensor_seen = false;
+        std::vector<SensorData> sensors;
+
         while (std::getline(data_file_ifstream, line)) {
+            // проверяем на наличие комментариев
+            size_t commentary_pos = line.find("//");
+            if (commentary_pos != std::string::npos) {
+                // комментарий есть, обрезаем строку
+                line = line.substr(0, commentary_pos);
+            }
+
             // убираем ведущие и последние незначащие пробелы
             try {
                 line = line.substr(line.find_first_not_of(" \t\n\r"), line.find_last_not_of(" \t\n\r"));
@@ -108,8 +173,46 @@ private:
                 // TODO если мы здесь, значит line == "". надо делать просто скип
                 std::cout << e.what();
             }
+
             std::cout << "line: " << line << '\n';
 
+            // проверяем, не начался ли другой датчик
+            if (config_.sensors_rule_to_name_.find(line.substr(0, line.size() - 1)) != config_.sensors_rule_to_name_.end()) {
+                // line - имя датчика
+                current_infile_sensor_name = line;
+                is_sensor_seen = false;
+                continue;
+            }
+
+            // проверяем на соответствие 
+            std::string regex_pattern;
+            std::smatch match;
+            
+            // проходимся по всем правилам
+            for (auto& [rule_name, rule] : config_.rules_) {
+                regex_pattern = rule["rule"];
+                std::regex pattern(regex_pattern);
+
+                if (std::regex_match(line, match, pattern)) {
+                    std::cout << "ETO MATCH " << match[1] << '\n';
+
+                    if (is_sensor_seen) {
+                        auto& sensor_data = sensors[sensors.size() - 1];
+                    }
+                    else {
+                        SensorData sensor_data;
+                        sensor_data.infile_sensor_name_ = current_infile_sensor_name;
+                        sensor_data.output_sensor_name_ = config_.sensors_rule_to_name_[current_infile_sensor_name];
+
+                        std::string rule_type = rule["type"];
+                        sensor_data.AddPropertyValue(rule_type, match, rule);
+                        sensors.push_back(sensor_data);
+                    }
+                    is_sensor_seen = true;
+                    break;
+                }
+                
+            }
         }
 
         FileData result;
@@ -124,7 +227,7 @@ private:
             if (dir_entry.is_regular_file()) {
                 std::filesystem::path file_path = dir_entry.path();
                 if (file_path.extension() == ".txt") {
-                    files_data_.push_back(ParseFile(file_path));
+                    file_data_list_.push_back(ParseFile(file_path));
                 }
             }
         }
@@ -134,6 +237,7 @@ private:
     }
 
 public:
+
     /// @brief configures parser based on config file
     /// @param path_to_config_file путь до файла конфигурации
     /// @return false если открыть файл не удалось, иначе true
@@ -160,6 +264,57 @@ public:
                     continue;
                 }
                 properties[property.key()] = property.value();
+            }
+
+            // приводим properties["rule"] к правильному для regexpr формату
+            std::string rule_type = properties["type"];
+            if (rule_type == "bool") {
+                std::string initial_string = properties["rule"];
+                size_t template_marker_pos = initial_string.find("(.*)");
+                std::string regexpr_pattern = initial_string.substr(0, template_marker_pos);
+                
+                regexpr_pattern += "(";
+                regexpr_pattern += properties["true"];
+                regexpr_pattern += "|";
+                regexpr_pattern += properties["false"];
+                regexpr_pattern += ")";
+
+                regexpr_pattern += initial_string.substr(template_marker_pos + 4); // 4 это длина строки "(.*)"
+                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                properties["rule"] = regexpr_pattern;
+            }
+            else if (rule_type == "value") {
+                std::string initial_string = properties["rule"];
+                size_t template_marker_pos = initial_string.find("(.*)");
+                std::string regexpr_pattern = initial_string.substr(0, template_marker_pos);
+                
+                regexpr_pattern += R"(([+-]?\d+(?:\.\d+)?))"; // TODO проверить, обязательно ли вообще R-строки юзать 
+
+                regexpr_pattern += initial_string.substr(template_marker_pos + 4);
+                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                properties["rule"] = regexpr_pattern;
+            }
+            else if (rule_type == "speed") {
+                std::string initial_string = properties["rule"];
+                size_t template_marker_pos = initial_string.find("(.*)");
+                std::string regexpr_pattern = initial_string.substr(0, template_marker_pos);
+
+                regexpr_pattern += R"(([+-]?\d+(?:\.\d+)?))";
+
+                size_t second_template_marker_pos = initial_string.find("(.*)", template_marker_pos + 4);
+                regexpr_pattern += initial_string.substr(template_marker_pos + 4, second_template_marker_pos - (template_marker_pos + 4));
+                regexpr_pattern += "(";
+                regexpr_pattern += data_rates_list_[0];
+
+                for (int i = 1; i < data_rates_list_.size(); i++) {
+                    regexpr_pattern += "|";
+                    regexpr_pattern += data_rates_list_[i];
+                }
+                regexpr_pattern += ")";
+
+                regexpr_pattern += initial_string.substr(second_template_marker_pos + 4);
+                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                properties["rule"] = regexpr_pattern;
             }
             std::cout << "#####\n\n";
         }
