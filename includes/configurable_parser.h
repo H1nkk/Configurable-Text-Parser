@@ -89,13 +89,13 @@ private:
             }
         }
 
-        void Dump(std::ostream& os = std::cout, const std::string& indent = "  ") const {
-            os << "infile_sensor_name_: " << infile_sensor_name_ << '\n';
-            os << "output_sensor_name_: " << output_sensor_name_ << '\n';
-            os << "property_to_value_:\n";
+        void Dump(std::ostream& os = std::cout, const std::string& indent = "") const {
+            os << indent << "infile_sensor_name_: " << infile_sensor_name_ << '\n';
+            os << indent << "output_sensor_name_: " << output_sensor_name_ << '\n';
+            os << indent << "property_to_value_:\n";
             
             for (const auto& [key, value] : property_to_value_) {
-                os << indent << "    " << key << ": ";
+                os << indent << "  " << key << ": ";
                 
                 if (std::holds_alternative<bool>(value)) {
                     bool val = std::get<bool>(value);
@@ -121,16 +121,16 @@ private:
 
         FileData(std::string&& file_name = "", std::vector<SensorData>&& sensors = {}) : file_name_(file_name), sensors_(sensors) {} 
 
-        void Dump(std::ostream& os = std::cout,  const std::string& indent = "  ") const {
-            os << "file_name_: " << file_name_ << '\n';
-            os << "sensors_:\n";
+        void Dump(std::ostream& os = std::cout,  const std::string& indent = "") const {
+            os << indent << "file_name_: " << file_name_ << '\n';
+            os << indent << "sensors_:\n";
             
             if (sensors_.empty()) {
                 os << indent << "(empty)\n";
             } else {
                 for (size_t i = 0; i < sensors_.size(); ++i) {
                     os << indent << "sensor[" << i << "]:\n";
-                    sensors_[i].Dump(os, "    ");
+                    sensors_[i].Dump(os, indent + "  ");
                 }
             }
         }
@@ -154,24 +154,24 @@ private:
             extractors_.clear();
         }
 
-        void Dump(std::ostream& os,  const std::string& indent = "  ") const {
-            os << "sensors_rule_to_name_:\n";
+        void Dump(std::ostream& os,  const std::string& indent = "") const {
+            os << indent << "  sensors_rule_to_name_:\n";
             for (auto& [key, value] : sensors_rule_to_name_) {
                 os << indent << key << ": " << value << '\n';
             }
 
-            os << "rules_:\n";
+            os << indent << "  rules_:\n";
             for (auto& [key, rule] : rules_) {
                 os << indent << key << ":\n";
-                os << rule;
+                os << indent << "  " << rule;
             }
 
             os << "extractors_:\n";
             for (auto& extractor : extractors_) {
                 
-                os << indent << extractor.name_ << ":\n";
+                os << indent << "  " << extractor.name_ << ":\n";
                 for (auto& rule_to_extract : extractor.rules_to_extract_) {
-                    os << indent << indent << rule_to_extract << "\n";
+                    os << indent << "    " << rule_to_extract << "\n";
                 }
             }
         }
@@ -258,7 +258,6 @@ private:
                         SensorData sensor_data;
                         sensor_data.infile_sensor_name_ = current_infile_sensor_name;
                         sensor_data.output_sensor_name_ = config_.sensors_rule_to_name_[current_infile_sensor_name];
-                        std::cout << "## " << current_infile_sensor_name << ":::" << sensor_data.output_sensor_name_ << '\n';
 
                         std::string rule_type = rule["type"];
                         sensor_data.AddPropertyValue(rule_type, rule_name, match, rule);
@@ -290,6 +289,11 @@ private:
                     file_data_list_.push_back(ParseFile(file_path));
                 }
             }
+        }
+
+        std::cout<<"###\n";
+        for (auto x : file_data_list_) {
+            x.Dump();
         }
     }
     void Analyze() {
