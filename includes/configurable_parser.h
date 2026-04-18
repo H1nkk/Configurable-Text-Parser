@@ -60,8 +60,7 @@ private:
         std::string output_sensor_name_;
         std::map<std::string, std::variant<bool, float, SpeedValue>> property_to_value_;
 
-        void AddPropertyValue(const std::string& rule_type, const std::smatch& match, Rule& rule) {
-            std::string rule_name = rule["name"];
+        void AddPropertyValue(const std::string& rule_type, const std::string& rule_name, const std::smatch& match, Rule& rule) {
             if (rule_type == "bool") {
                 if (match[1] == rule["true"]) {
                     property_to_value_[rule_name] = true;
@@ -89,6 +88,31 @@ private:
                 }
             }
         }
+
+        void Dump(std::ostream& os = std::cout, const std::string& indent = "    ") const {
+            os << indent << "infile_sensor_name_: " << infile_sensor_name_ << '\n';
+            os << indent << "output_sensor_name_: " << output_sensor_name_ << '\n';
+            os << indent << "property_to_value_:\n";
+            
+            for (const auto& [key, value] : property_to_value_) {
+                os << indent << "    " << key << ": ";
+                
+                if (std::holds_alternative<bool>(value)) {
+                    bool val = std::get<bool>(value);
+                    os << (val ? "true" : "false");
+                }
+                else if (std::holds_alternative<float>(value)) {
+                    float val = std::get<float>(value);
+                    os << val;
+                }
+                else if (std::holds_alternative<SpeedValue>(value)) {
+                    SpeedValue val = std::get<SpeedValue>(value);
+                    os << val.value << " " << val.unit << "/s";
+                }
+                
+                os << '\n';
+            }
+        }
     };
 
     struct FileData {
@@ -109,13 +133,13 @@ private:
         std::map<std::string, Rule> rules_;
         std::vector<Extractor> extractors_;
 
-        void clear() {
+        void Clear() {
             sensors_rule_to_name_.clear();
             rules_.clear();
             extractors_.clear();
         }
 
-        void dump(std::ostream& os) {
+        void Dump(std::ostream& os) {
             os << "sensors_rule_to_name_:\n";
             for (auto& [key, value] : sensors_rule_to_name_) {
                 os << "  " << key << ": " << value << '\n';
@@ -167,14 +191,18 @@ private:
 
             // убираем ведущие и последние незначащие пробелы
             try {
-                line = line.substr(line.find_first_not_of(" \t\n\r"), line.find_last_not_of(" \t\n\r"));
+                if (line.find_first_not_of(" \t\n\r") != std::string::npos) {
+                    line = line.substr(line.find_first_not_of(" \t\n\r"), line.find_last_not_of(" \t\n\r") - line.find_first_not_of(" \t\n\r") + 1);
+                } 
+                else {
+                    continue;
+                }
             }
             catch (std::exception &e) {
                 // TODO если мы здесь, значит line == "". надо делать просто скип
-                std::cout << e.what();
+                std::cout << e.what() << '\n';
             }
 
-            std::cout << "line: " << line << '\n';
 
             // проверяем, не начался ли другой датчик
             if (config_.sensors_rule_to_name_.find(line.substr(0, line.size() - 1)) != config_.sensors_rule_to_name_.end()) {
@@ -184,20 +212,26 @@ private:
                 continue;
             }
 
+            std::cout << "line: " << line << " datchik: " << current_infile_sensor_name << '\n';
+
+
             // проверяем на соответствие 
             std::string regex_pattern;
-            std::smatch match;
+            
             
             // проходимся по всем правилам
             for (auto& [rule_name, rule] : config_.rules_) {
                 regex_pattern = rule["rule"];
                 std::regex pattern(regex_pattern);
+                std::smatch match;
 
                 if (std::regex_match(line, match, pattern)) {
-                    std::cout << "ETO MATCH " << match[1] << '\n';
+                    // std::cout << "ETO MATCH " << match[1] << '\n';
 
                     if (is_sensor_seen) {
                         auto& sensor_data = sensors[sensors.size() - 1];
+                        std::string rule_type = rule["type"];
+                        sensor_data.AddPropertyValue(rule_type, rule_name, match, rule);
                     }
                     else {
                         SensorData sensor_data;
@@ -205,7 +239,7 @@ private:
                         sensor_data.output_sensor_name_ = config_.sensors_rule_to_name_[current_infile_sensor_name];
 
                         std::string rule_type = rule["type"];
-                        sensor_data.AddPropertyValue(rule_type, match, rule);
+                        sensor_data.AddPropertyValue(rule_type, rule_name, match, rule);
                         sensors.push_back(sensor_data);
                     }
                     is_sensor_seen = true;
@@ -215,6 +249,10 @@ private:
             }
         }
 
+        for (auto& e: sensors) {
+            e.Dump(std::cout);
+        }
+        
         FileData result;
         result.file_name_ = file_name;
         return result;
@@ -243,7 +281,7 @@ public:
     /// @return false если открыть файл не удалось, иначе true
     bool Configure(const std::string& path_to_config_file) {
         // сначала очищаем config_
-        config_.clear();
+        config_.Clear();
 
         std::ifstream config_file_ifstream(path_to_config_file);
         if (!config_file_ifstream.is_open()) {
@@ -330,7 +368,7 @@ public:
 
 
         std::cout << "\nconfig.dump:\n";
-        config_.dump(std::cout);
+        config_.Dump(std::cout);
         return true;
     }
 
