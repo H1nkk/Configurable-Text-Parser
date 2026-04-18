@@ -119,6 +119,7 @@ private:
         std::string file_name_;
         std::vector<SensorData> sensors_;
 
+        FileData(std::string&& file_name = "", std::vector<SensorData>&& sensors = {}) : file_name_(file_name), sensors_(sensors) {} 
     };
 
 
@@ -169,7 +170,6 @@ private:
     };
 
     FileData ParseFile(const std::filesystem::path& path_to_file) {
-        // TODO переделать составление result (заменить на конструктор)
         std::string file_name = path_to_file.filename().string();
         std::ifstream data_file_ifstream(path_to_file);
         if (!data_file_ifstream.is_open()) {
@@ -201,6 +201,7 @@ private:
             catch (std::exception &e) {
                 // TODO если мы здесь, значит line == "". надо делать просто скип
                 std::cout << e.what() << '\n';
+                continue;
             }
 
 
@@ -253,8 +254,8 @@ private:
             e.Dump(std::cout);
         }
         
-        FileData result;
-        result.file_name_ = file_name;
+        FileData result(std::move(file_name), std::move(sensors));
+
         return result;
     }
     void Parse(const std::string& path_to_files) { // заполняет files_data
