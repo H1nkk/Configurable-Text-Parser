@@ -1,5 +1,21 @@
 # Configurable-Text-Parser
 
+## Запуск в Docker
+
+Для сборки Docker-образа используйте следующую команду, находясь в корне проекта:
+```bash
+docker build -t configurable-parser .
+```
+
+Для запуска парсера в Docker-контейнере используйте следующую команду:
+```bash
+docker run -v ./test:/app/test configurable-parser ./bin/parser --config ./test/example_test/configs/example.json --data ./test/example_test/sensor_data/ --parallel
+```
+
+Флаг `-v ./test:/app/test` монтирует локальную директорию `test/` в контейнер, что позволяет парсеру видеть файлы датчиков, сгенерированные на хосте.
+
+Подробнее про параметры запуска парсера читайте [здесь](#запуск-парсера)
+
 ## Сборка проекта
 Чтобы собрать проект, используйте следующую команду, находясь в корне проекта (на системе должен быть установлен python):
 ```bash
