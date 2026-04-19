@@ -11,18 +11,27 @@
 
 using json = nlohmann::json;
 
+// TODO: глобально:
+// дописать Analyze()
+// распараллелить
+// разобраться с cmake
+// написать генератор анализируемых файлов
+// гугл тесты
+// сделать docker
+
 // TODO: добавить всякие проверки в Parser::Configure
 // TODO: заменить map на unordered_map где нужно
 // TODO: сделать проверку что нет rule с одинаковым именем в json-файле
 
 class Parser {
 private:
-    enum types {
+    enum types { // TODO удалить?
         kBool = 0,
         kFloat = 1,
         kUnsignedLL = 2
     };
     
+// *** Структуры класса ***
     struct SpeedValue {
         float value;
         std::string unit;
@@ -177,11 +186,77 @@ private:
         }
     };
     
+    struct SensorPropertyValue {
+        std::string infile_property_value_;
+        std::variant<bool, float, SpeedValue> actual_value_;
+
+        SensorPropertyValue() : actual_value_(false) {}
+    };
+
+    struct SensorMaxMinValues {
+        std::string max_containing_file_;
+        SensorPropertyValue max_;
+        std::string min_containing_file_;
+        SensorPropertyValue min_;
+
+        SensorMaxMinValues() = default;
+    };
+
+    struct SensorAnalysisResult {
+        std::string infile_sensor_name_;
+        std::string output_sensor_name_;
+
+        std::map<std::string, SensorMaxMinValues>  property_to_max_min_;
+    };
+
+// *** Поля класса ***
     Config config_;
     std::vector<FileData> file_data_list_;
     const std::vector<std::string> data_rates_list_ {
         "bit", "Kbit", "Mbit", "Gbit", "Tbit", "Pbit"
     };
+
+// *** Методы класса ***
+    template<typename T>
+    static bool IsGreater(const T& a, const T& b) {
+        return a > b;
+    }
+    
+    // Специализация для SpeedValue
+    static bool IsGreater(const SpeedValue& a, const SpeedValue& b) {
+        return a.value_in_mbit > b.value_in_mbit;
+    }
+    
+    // Специализация для bool (false < true)
+    static bool IsGreater(bool a, bool b) {
+        return a && !b;
+    }
+
+    double GetNumericValue(const std::variant<bool, float, SpeedValue>& value) const {
+        if (std::holds_alternative<float>(value)) {
+            return std::get<float>(value);
+        } else if (std::holds_alternative<SpeedValue>(value)) {
+            return std::get<SpeedValue>(value).value_in_mbit;
+        } else if (std::holds_alternative<bool>(value)) {
+            return std::get<bool>(value) ? 1.0 : 0.0;
+        }
+        return 0.0;
+    }
+
+    std::string ValueToString(const std::variant<bool, float, SpeedValue>& value) const {
+        if (std::holds_alternative<bool>(value)) {
+            return std::get<bool>(value) ? "true" : "false";
+        } 
+        else if (std::holds_alternative<float>(value)) {
+            return std::to_string(std::get<float>(value));
+        }
+        else if (std::holds_alternative<SpeedValue>(value)) {
+            const auto& sv = std::get<SpeedValue>(value);
+            return std::to_string(sv.value) + " " + sv.unit;
+        }
+        return "unknown";
+    }
+
 
     FileData ParseFile(const std::filesystem::path& path_to_file) {
         std::string file_name = path_to_file.filename().string();
@@ -280,7 +355,8 @@ private:
     }
     void Parse(const std::string& path_to_files) { // заполняет files_data
         // тут можно сделать проверку, что есть хотя бы один файл для парсинга
-        // ещё сюда можно добавить параллельности
+        // ещё сюда можно добавить параллельности 
+        // TODO сделать чтобы параллельность переключалась флагом --parallel
         std::filesystem::path test{path_to_files};
         for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
             if (dir_entry.is_regular_file()) {
@@ -296,8 +372,45 @@ private:
             x.Dump();
         }
     }
-    void Analyze() {
-
+    
+    void AnalyzeFile(const FileData& file_data, 
+                 std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
+        const std::string& current_file = file_data.file_name_;
+        
+        for (const auto& sensor_data : file_data.sensors_) {
+            const std::string& sensor_name = sensor_data.output_sensor_name_;
+            
+            auto& analysis_result = sensor_to_analysis_result[sensor_name];
+            analysis_result.output_sensor_name_ = sensor_name;
+            analysis_result.infile_sensor_name_ = sensor_data.infile_sensor_name_;
+            
+            for (const auto& [property_name, property_value] : sensor_data.property_to_value_) {
+                auto& max_min = analysis_result.property_to_max_min_[property_name];
+                
+                // Обновляем максимум
+                if (max_min.max_.actual_value_.index() == 0 || 
+                    GetNumericValue(property_value) > GetNumericValue(max_min.max_.actual_value_)) {
+                    max_min.max_.actual_value_ = property_value;
+                    max_min.max_containing_file_ = current_file;
+                    max_min.max_.infile_property_value_ = ValueToString(property_value);
+                }
+                
+                // Обновляем минимум
+                if (max_min.min_.actual_value_.index() == 0 || 
+                    GetNumericValue(property_value) < GetNumericValue(max_min.min_.actual_value_)) {
+                    max_min.min_.actual_value_ = property_value;
+                    max_min.min_containing_file_ = current_file;
+                    max_min.min_.infile_property_value_ = ValueToString(property_value);
+                }
+            }
+        }
+    }
+    
+    void Analyze(std::ostream& os = std::cout) {
+        std::map<std::string, SensorAnalysisResult> sensor_to_analysis_result;
+        for (const auto& file_data : file_data_list_) {
+            AnalyzeFile(file_data, sensor_to_analysis_result);
+        }
     }
 
 public:
