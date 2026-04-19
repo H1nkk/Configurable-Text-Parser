@@ -12,9 +12,9 @@
 using json = nlohmann::json;
 
 // TODO: глобально:
-// дописать Analyze()
-// распараллелить
-// разобраться с cmake
+// дописать Analyze() +
+// распараллелить +
+// разобраться с cmake ?
 // написать генератор анализируемых файлов
 // гугл тесты
 // сделать docker
@@ -260,7 +260,7 @@ private:
         }
         else if (std::holds_alternative<SpeedValue>(value)) {
             const auto& sv = std::get<SpeedValue>(value);
-            return std::to_string(sv.value) + " " + sv.unit;
+            return std::to_string(sv.value) + " " + sv.unit + "/s";
         }
         return "unknown";
     }
@@ -361,10 +361,41 @@ private:
 
         return result;
     }
-    void Parse(const std::string& path_to_files) { // заполняет files_data
+    void ParseNonParallel(const std::string& path_to_files) { // заполняет files_data
         // тут можно сделать проверку, что есть хотя бы один файл для парсинга
         // ещё сюда можно добавить параллельности 
         // TODO сделать чтобы параллельность переключалась флагом --parallel
+        std::filesystem::path test{path_to_files};
+        std::vector<std::filesystem::path> files_to_process_list;
+        
+        for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
+            if (dir_entry.is_regular_file()) {
+                std::filesystem::path file_path = dir_entry.path();
+                if (file_path.extension() == ".txt") {
+                    files_to_process_list.push_back(file_path);
+                }
+            }
+        }
+        file_data_list_.resize(files_to_process_list.size());
+
+        size_t files_to_process_count = files_to_process_list.size();
+
+#pragma omp parallel for
+        for (int i = 0; i < files_to_process_count; i++) {
+            file_data_list_[i] = ParseFile(files_to_process_list[i]);
+        }
+
+        std::cout<<"###\n";
+        for (auto x : file_data_list_) {
+            x.Dump();
+        }
+    }
+
+    void ParseParallel(const std::string& path_to_files) { // заполняет files_data
+        // тут можно сделать проверку, что есть хотя бы один файл для парсинга
+        // ещё сюда можно добавить параллельности 
+        // TODO сделать чтобы параллельность переключалась флагом --parallel
+        std::cout << "using parallel version\n";
         std::filesystem::path test{path_to_files};
         for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
             if (dir_entry.is_regular_file()) {
@@ -458,19 +489,17 @@ private:
                 
                 const auto& max_min = prop_it->second;
                 
-                // Получаем true/false названия для bool правил
+                // Меняем вывод для bool значений 
                 std::string true_name = "true";
                 std::string false_name = "false";
-                
-                // Используем operator[] вместо at()
+
                 if (rule["type"] == "bool") {
-                    true_name = rule["true"];    // operator[] вернет ссылку на строку
+                    true_name = rule["true"];
                     false_name = rule["false"];
                 }
                 
-                os << "    " << rule_name << ": ";
+                os << "  " << rule_name << ": ";
                 
-                // Выводим max
                 os << "max=" << ValueToString(max_min.max_.actual_value_, true_name, false_name);
                 if (!max_min.max_containing_file_.empty()) {
                     os << "(" << max_min.max_containing_file_ << ")";
@@ -478,7 +507,6 @@ private:
                 
                 os << ", ";
                 
-                // Выводим min
                 os << "min=" << ValueToString(max_min.min_.actual_value_, true_name, false_name);
                 if (!max_min.min_containing_file_.empty()) {
                     os << "(" << max_min.min_containing_file_ << ")";
@@ -592,8 +620,14 @@ public:
     /// @brief Запускает парсер. Перед запуском необходимо настроить парсер с помощью `configure()`
     /// @param path_to_files путь до директории, содержащей файлы для обработки. Обрабатываются все файлы формата *.txt из директории
     /// @param os поток для вывода результата анализа
-    void Run(std::string path_to_files, std::ostream& os = std::cout) {
-        Parse(path_to_files);
+    /// @param parallel_mode `true` - использовать параллельную версию парсинга, `false` - использовать непараллельную версию парсинга
+    void Run(std::string path_to_files, std::ostream& os = std::cout, bool parallel_mode = false) {
+        if (parallel_mode) {
+            ParseParallel(path_to_files);
+        }
+        else {
+            ParseNonParallel(path_to_files);
+        }
         Analyze();
     }
 };
