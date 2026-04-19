@@ -41,7 +41,7 @@ private:
 
     struct Rule {
 private:
-        std::map<std::string, std::string> properties_;
+        std::unordered_map<std::string, std::string> properties_;
 public:
         std::string& operator[](const std::string& propetry_name) {
             return properties_[propetry_name];
@@ -67,7 +67,7 @@ public:
     struct SensorData {
         std::string infile_sensor_name_;
         std::string output_sensor_name_;
-        std::map<std::string, std::variant<bool, float, SpeedValue>> property_to_value_;
+        std::unordered_map<std::string, std::variant<bool, float, SpeedValue>> property_to_value_;
 
         void AddPropertyValue(const std::string& rule_type, const std::string& rule_name, const std::smatch& match, Rule& rule) {
             if (rule_type == "bool") {
@@ -142,9 +142,9 @@ public:
     };
     
     struct Config {
-        std::map<std::string, std::string> sensors_rule_to_name_;
-        std::map<std::string, Rule> rules_;
-        std::map<std::string, std::vector<std::string>> extractors_;
+        std::unordered_map<std::string, std::string> sensors_rule_to_name_;
+        std::unordered_map<std::string, Rule> rules_;
+        std::unordered_map<std::string, std::vector<std::string>> extractors_;
 
         void Clear() {
             sensors_rule_to_name_.clear();
@@ -195,7 +195,7 @@ public:
         std::string infile_sensor_name_;
         std::string output_sensor_name_;
 
-        std::map<std::string, SensorMaxMinValues>  property_to_max_min_;
+        std::unordered_map<std::string, SensorMaxMinValues>  property_to_max_min_;
     };
 
 // *** Поля класса ***
@@ -369,7 +369,7 @@ public:
         }
     }
     
-    void AnalyzeFile(const FileData& file_data, std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
+    void AnalyzeFile(const FileData& file_data, std::unordered_map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
         const std::string& current_file = file_data.file_name_;
         
         for (const auto& sensor_data : file_data.sensors_) {
@@ -407,7 +407,7 @@ public:
     }
     
     void Analyze(std::ostream& os = std::cout) {
-        std::map<std::string, SensorAnalysisResult> sensor_to_analysis_result;
+        std::unordered_map<std::string, SensorAnalysisResult> sensor_to_analysis_result;
 
         // собираем данные со всех файлов
         for (const auto& file_data : file_data_list_) {
