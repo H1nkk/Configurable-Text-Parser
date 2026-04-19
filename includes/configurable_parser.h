@@ -97,8 +97,8 @@ private:
                         SpeedValue speed(value, unit);
                         property_to_value_[rule_name] = speed;
                         
-                        std::cout << "  Скорость: " << speed.value << " " << speed.unit 
-                                << " (" << speed.value_in_mbit << " Mbit/s)" << std::endl;
+                        // std::cout << "  Скорость: " << speed.value << " " << speed.unit 
+                        //        << " (" << speed.value_in_mbit << " Mbit/s)" << std::endl;
                     } catch (const std::exception& e) {
                         std::cerr << "Ошибка парсинга скорости: " << e.what() << std::endl;
                     }
@@ -316,7 +316,7 @@ private:
                 continue;
             }
 
-            std::cout << "line: " << line << " datchik: " << current_infile_sensor_name << '\n';
+            // std::cout << "line: " << line << " datchik: " << current_infile_sensor_name << '\n';
 
 
             // проверяем на соответствие 
@@ -353,9 +353,9 @@ private:
             }
         }
 
-        for (auto& e: sensors) {
-            e.Dump(std::cout);
-        }
+        // for (auto& e: sensors) {
+        //    e.Dump(std::cout);
+        //}
         
         FileData result(std::move(file_name), std::move(sensors));
 
@@ -385,10 +385,10 @@ private:
             file_data_list_[i] = ParseFile(files_to_process_list[i]);
         }
 
-        std::cout<<"###\n";
-        for (auto x : file_data_list_) {
-            x.Dump();
-        }
+        //std::cout<<"###\n";
+        //for (auto x : file_data_list_) {
+            //x.Dump();
+        //}
     }
 
     void ParseParallel(const std::string& path_to_files) { // заполняет files_data
@@ -406,10 +406,9 @@ private:
             }
         }
 
-        std::cout<<"###\n";
-        for (auto x : file_data_list_) {
-            x.Dump();
-        }
+        //for (auto x : file_data_list_) {
+        //    x.Dump();
+        //}
     }
     
     void AnalyzeFile(const FileData& file_data, std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
@@ -450,7 +449,6 @@ private:
     }
     
     void Analyze(std::ostream& os = std::cout) {
-        os << "================== ANALYSIS RESULTS ==============\n";
         std::map<std::string, SensorAnalysisResult> sensor_to_analysis_result;
 
         // собираем данные со всех файлов
@@ -535,7 +533,7 @@ public:
         json data = json::parse(config_file_ifstream);
 
         for (auto& sensor : data["sensors"]) {
-            std::cout << sensor["rule"] << ": " << sensor["name"] << '\n';
+            // std::cout << sensor["rule"] << ": " << sensor["name"] << '\n';
             config_.sensors_rule_to_name_[sensor["rule"]] = sensor["name"];
         }
 
@@ -562,7 +560,7 @@ public:
                 regexpr_pattern += ")";
 
                 regexpr_pattern += initial_string.substr(template_marker_pos + 4); // 4 это длина строки "(.*)"
-                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
             else if (rule_type == "value") {
@@ -573,7 +571,7 @@ public:
                 regexpr_pattern += R"(([+-]?\d+(?:\.\d+)?))"; // TODO проверить, обязательно ли вообще R-строки юзать 
 
                 regexpr_pattern += initial_string.substr(template_marker_pos + 4);
-                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
             else if (rule_type == "speed") {
@@ -595,10 +593,10 @@ public:
                 regexpr_pattern += ")";
 
                 regexpr_pattern += initial_string.substr(second_template_marker_pos + 4);
-                std::cout << "получился regexpr: " << regexpr_pattern << '\n';
+                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
-            std::cout << "#####\n\n";
+            // std::cout << "#####\n\n";
         }
 
         for (auto& extractor : data["extractors"]) {
@@ -612,8 +610,8 @@ public:
         }
 
 
-        std::cout << "\nconfig.dump:\n";
-        config_.Dump(std::cout);
+        //std::cout << "\nconfig.dump:\n";
+        //config_.Dump(std::cout);
         return true;
     }
 

@@ -1,5 +1,5 @@
 # Минимальная версия CMake
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.28)
 
 # Название проекта
 project(ConfigurableTextParser VERSION 1.0.0 LANGUAGES CXX)
@@ -29,17 +29,33 @@ target_include_directories(${PROJECT_NAME}
         ${INCLUDES_DIR}
 )
 
+# Находим пакет OpenMP
+find_package(OpenMP REQUIRED)
+
+# Добавляем OpenMP к целевому проекту
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP)
+    message(STATUS "OpenMP found and enabled")
+    
+    # Дополнительные опции для OpenMP
+    if(MSVC)
+        # Для MSVC
+        target_compile_options(${PROJECT_NAME} PRIVATE /openmp)
+    else()
+        # Для GCC/Clang
+        target_compile_options(${PROJECT_NAME} PRIVATE -fopenmp)
+    endif()
+else()
+    message(WARNING "OpenMP not found, parallel mode will be disabled")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_OPENMP=0)
+endif()
+
 # Опционально: настройки для разных конфигураций сборки
 set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
 )
 
-# Опционально: включаем предупреждения компилятора
-#if(MSVC)
-#    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
-#else()
-#    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
-#endif()
 
 # Выводим информацию о путях (полезно для отладки)
 message(STATUS "Project: ${PROJECT_NAME}")

@@ -2,21 +2,19 @@
 #include "configurable_parser.h"
 #include <iostream>
 #include <fstream>
-#include <windows.h>
 
 using json = nlohmann::json;
 
 using namespace std;
 
 int main(int argc, char* argv[]) {
-    SetConsoleOutputCP(CP_UTF8); 
-    SetConsoleCP(CP_UTF8);  
+
 
     cout << "\n";
     Parser parser;
     bool parallel_mode = false;
-    string config_path = "test/configs/example.json";
-    string data_path = "test/sensor_data/";
+    string config_path = "test/example_test/configs/example.json";
+    string data_path = "test/example_test/sensor_data/";
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--parallel") == 0) {
             parallel_mode = true;
