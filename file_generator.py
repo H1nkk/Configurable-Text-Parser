@@ -96,8 +96,9 @@ if __name__ == "__main__":
             sys.exit(1)
         
         # Создаем папку если её нет
-        os.makedirs("test/sensor_data", exist_ok=True)
-        
+        os.makedirs("test/complex_test/sensor_data", exist_ok=True)
+        os.makedirs("test/complex_test/configs", exist_ok=True)
+
         # Генерируем файлы
         for file_num in range(1, num_files + 1):
             file_path = f"test/complex_test/sensor_data/sensor_data_{file_num}.txt"
