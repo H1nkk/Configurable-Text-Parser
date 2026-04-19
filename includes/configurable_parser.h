@@ -8,16 +8,16 @@
 #include <json.hpp>
 #include <filesystem>
 #include <regex>
-
+#include <sstream>
 using json = nlohmann::json;
 
 // TODO: глобально:
 // дописать Analyze() +
 // распараллелить +
 // разобраться с cmake ?
-// написать генератор анализируемых файлов
-// гугл тесты
+// написать генератор анализируемых файлов +
 // сделать docker
+// todo-шки в файлах
 
 // TODO: добавить всякие проверки в Parser::Configure
 // TODO: заменить map на unordered_map где нужно
@@ -25,12 +25,6 @@ using json = nlohmann::json;
 
 class Parser {
 private:
-    enum types { // TODO удалить?
-        kBool = 0,
-        kFloat = 1,
-        kUnsignedLL = 2
-    };
-    
 // *** Структуры класса ***
     struct SpeedValue {
         float value;
@@ -194,7 +188,6 @@ private:
     };
     
     struct SensorPropertyValue {
-        std::string infile_property_value_;
         std::variant<bool, float, SpeedValue> actual_value_;
 
         SensorPropertyValue() : actual_value_(false) {}
@@ -225,21 +218,6 @@ private:
     };
 
 // *** Методы класса ***
-    template<typename T>
-    static bool IsGreater(const T& a, const T& b) {
-        return a > b;
-    }
-    
-    // Специализация для SpeedValue
-    static bool IsGreater(const SpeedValue& a, const SpeedValue& b) {
-        return a.value_in_mbit > b.value_in_mbit;
-    }
-    
-    // Специализация для bool (false < true)
-    static bool IsGreater(bool a, bool b) {
-        return a && !b;
-    }
-
     double GetNumericValue(const std::variant<bool, float, SpeedValue>& value) const {
         if (std::holds_alternative<float>(value)) {
             return std::get<float>(value);
@@ -251,12 +229,15 @@ private:
         return 0.0;
     }
 
-    std::string ValueToString(const std::variant<bool, float, SpeedValue>& value, const std::string& true_name = "true", const std::string& false_name = "false") const {
+    std::string ValueToString(const std::variant<bool, float, SpeedValue>& value, 
+        const std::string& true_name = "true", const std::string& false_name = "false") const {
         if (std::holds_alternative<bool>(value)) {
             return std::get<bool>(value) ? true_name : false_name;
         } 
         else if (std::holds_alternative<float>(value)) {
-            return std::to_string(std::get<float>(value));
+            std::ostringstream oss;
+            oss << std::get<float>(value);
+            return oss.str();
         }
         else if (std::holds_alternative<SpeedValue>(value)) {
             const auto& sv = std::get<SpeedValue>(value);
@@ -270,7 +251,7 @@ private:
         std::string file_name = path_to_file.filename().string();
         std::ifstream data_file_ifstream(path_to_file);
         if (!data_file_ifstream.is_open()) {
-            throw "Couldn't open " + path_to_file.string() + " file."; // TODO обернуть в красивый тип исключения
+            throw std::runtime_error("Couldn't open " + path_to_file.string() + " file."); // TODO обернуть в красивый тип исключения
         }
 
         std::string line = "";
@@ -278,7 +259,11 @@ private:
         bool is_sensor_seen = false;
         std::vector<SensorData> sensors;
 
+        std::vector<std::string> errors;
+
+        unsigned int line_number = 0;
         while (std::getline(data_file_ifstream, line)) {
+            ++line_number;
             // проверяем на наличие комментариев
             size_t commentary_pos = line.find("//");
             if (commentary_pos != std::string::npos) {
@@ -289,14 +274,16 @@ private:
             // убираем ведущие и последние незначащие пробелы
             try {
                 if (line.find_first_not_of(" \t\n\r") != std::string::npos) {
-                    line = line.substr(line.find_first_not_of(" \t\n\r"), line.find_last_not_of(" \t\n\r") - line.find_first_not_of(" \t\n\r") + 1);
+                    line = line.substr(
+                        line.find_first_not_of(" \t\n\r"),
+                        line.find_last_not_of(" \t\n\r") - line.find_first_not_of(" \t\n\r") + 1
+                    );
                 } 
                 else {
                     continue;
                 }
             }
             catch (std::exception &e) {
-                // TODO если мы здесь, значит line == "". надо делать просто скип
                 std::cout << e.what() << '\n';
                 continue;
             }
@@ -321,7 +308,7 @@ private:
 
             // проверяем на соответствие 
             std::string regex_pattern;
-            
+            bool matched = false;
             
             // проходимся по всем правилам
             for (auto& [rule_name, rule] : config_.rules_) {
@@ -330,8 +317,6 @@ private:
                 std::smatch match;
 
                 if (std::regex_match(line, match, pattern)) {
-                    // std::cout << "ETO MATCH " << match[1] << '\n';
-
                     if (is_sensor_seen) {
                         auto& sensor_data = sensors[sensors.size() - 1];
                         std::string rule_type = rule["type"];
@@ -347,24 +332,32 @@ private:
                         sensors.push_back(sensor_data);
                     }
                     is_sensor_seen = true;
+                    // ++line_number;
+                    matched = true;
                     break;
                 }
-                
             }
+
+            if (!matched) {
+                errors.push_back("Parsing error at file " + path_to_file.string() 
+                            + ", line " + std::to_string(line_number) 
+                            + ": Couldn't parse this line");
+            }
+
         }
 
-        // for (auto& e: sensors) {
-        //    e.Dump(std::cout);
-        //}
-        
+        for (const auto& err : errors) {
+            std::cout << err << '\n';
+        }
+       
         FileData result(std::move(file_name), std::move(sensors));
-
         return result;
     }
-    void ParseNonParallel(const std::string& path_to_files) { // заполняет files_data
+    void ParseParallel(const std::string& path_to_files) { // заполняет files_data
         // тут можно сделать проверку, что есть хотя бы один файл для парсинга
         // ещё сюда можно добавить параллельности 
         // TODO сделать чтобы параллельность переключалась флагом --parallel
+
         std::filesystem::path test{path_to_files};
         std::vector<std::filesystem::path> files_to_process_list;
         
@@ -391,11 +384,10 @@ private:
         //}
     }
 
-    void ParseParallel(const std::string& path_to_files) { // заполняет files_data
+    void ParseNonParallel(const std::string& path_to_files) { // заполняет files_data
         // тут можно сделать проверку, что есть хотя бы один файл для парсинга
         // ещё сюда можно добавить параллельности 
         // TODO сделать чтобы параллельность переключалась флагом --parallel
-        std::cout << "using parallel version\n";
         std::filesystem::path test{path_to_files};
         for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
             if (dir_entry.is_regular_file()) {
@@ -626,6 +618,6 @@ public:
         else {
             ParseNonParallel(path_to_files);
         }
-        Analyze();
+        Analyze(os);
     }
 };

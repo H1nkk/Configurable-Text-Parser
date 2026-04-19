@@ -3,12 +3,19 @@
 #include <iostream>
 #include <fstream>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 using json = nlohmann::json;
 
 using namespace std;
 
 int main(int argc, char* argv[]) {
-
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8); 
+    SetConsoleCP(CP_UTF8);  
+#endif
 
     cout << "\n";
     Parser parser;
@@ -29,14 +36,23 @@ int main(int argc, char* argv[]) {
             cout << "Usage: " << argv[0] << " [options]\n"
                  << "Options:\n"
                  << "  --parallel          Enable parallel parsing mode\n"
-                 << "  --config <path>     Path to config file (default: test/configs/example.json)\n"
-                 << "  --data <path>       Path to data directory (default: test/sensor_data/)\n"
+                 << "  --config <path>     Path to config file (default: test/example_test/configs/example.json)\n"
+                 << "  --data <path>       Path to data directory (default: test/example_test/sensor_data/)\n"
                  << "  --help, -h          Show this help message\n";
             return 0;
         }
     }
 
-    parser.Configure(config_path);
+    try {
+        bool configure_complete = parser.Configure(config_path);
+        if (!configure_complete) {
+            std::cerr << "Couldn't find config file, aborting\n";
+            return -1;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
     parser.Run(data_path, std::cout, parallel_mode);
     return 0;
 }
