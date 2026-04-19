@@ -16,27 +16,28 @@ using json = nlohmann::json;
 // распараллелить +
 // разобраться с cmake ?
 // написать генератор анализируемых файлов +
-// сделать docker
-// todo-шки в файлах
-
-// TODO: заменить map на unordered_map где нужно
+// сделать docker +
+// todo-шки в файлах +
 
 class Parser {
 private:
-// *** Структуры класса ***
+
+
+// ============== Структуры класса ==============
+
     struct SpeedValue {
         float value;
         std::string unit;
         float value_in_mbit;
         SpeedValue(float v, const std::string& u) : value(v), unit(u) {
-        if (unit == "Kbit") value_in_mbit = value / 1000.0f;
-        else if (unit == "Mbit") value_in_mbit = value;
-        else if (unit == "Gbit") value_in_mbit = value * 1000.0f;
-        else if (unit == "Tbit") value_in_mbit = value * 1000000.0f;
-        else if (unit == "Pbit") value_in_mbit = value * 1000000000.0f;
-        else if (unit == "bit") value_in_mbit = value / 1000000.0f;
-        else value_in_mbit = value;
-    }
+            if (unit == "Kbit") value_in_mbit = value / 1000.0f;
+            else if (unit == "Mbit") value_in_mbit = value;
+            else if (unit == "Gbit") value_in_mbit = value * 1000.0f;
+            else if (unit == "Tbit") value_in_mbit = value * 1000000.0f;
+            else if (unit == "Pbit") value_in_mbit = value * 1000000000.0f;
+            else if (unit == "bit") value_in_mbit = value / 1000000.0f;
+            else value_in_mbit = value;
+        }
     };
 
     struct Rule {
@@ -88,7 +89,7 @@ public:
                         SpeedValue speed(value, unit);
                         property_to_value_[rule_name] = speed;
                     } catch (const std::exception& e) {
-                        std::cerr << "Ошибка парсинга скорости: " << e.what() << std::endl;
+                        std::cerr << "Speed parsing error: " << e.what() << std::endl;
                     }
                 }
             }
@@ -198,14 +199,18 @@ public:
         std::unordered_map<std::string, SensorMaxMinValues>  property_to_max_min_;
     };
 
-// *** Поля класса ***
+
+// ============== Поля класса ==============
+
     Config config_;
     std::vector<FileData> file_data_list_;
     const std::vector<std::string> data_rates_list_ {
         "bit", "Kbit", "Mbit", "Gbit", "Tbit", "Pbit"
     };
 
-// *** Методы класса ***
+
+// ============== Методы класса ==============
+
     double GetNumericValue(const std::variant<bool, float, SpeedValue>& value) const {
         if (std::holds_alternative<float>(value)) {
             return std::get<float>(value);
@@ -229,7 +234,9 @@ public:
         }
         else if (std::holds_alternative<SpeedValue>(value)) {
             const auto& sv = std::get<SpeedValue>(value);
-            return std::to_string(sv.value) + " " + sv.unit + "/s";
+            std::ostringstream oss;
+            oss << sv.value << " " << sv.unit << "/s";
+            return oss.str();
         }
         return "unknown";
     }
@@ -476,7 +483,7 @@ public:
 
 public:
 
-    /// @brief configures parser based on config file
+    /// @brief задаёт конфигурацию парсера на основе файла конфигурации
     /// @param path_to_config_file путь до файла конфигурации
     /// @return false если открыть файл не удалось, иначе true
     bool Configure(const std::string& path_to_config_file) {
