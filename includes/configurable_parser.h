@@ -147,15 +147,14 @@ private:
 
 
 
-    struct Extractor {
-        std::string name_;
-        std::vector<std::string> rules_to_extract_;
-    };
+    //struct Extractor {
+    //    std::vector<std::string> rules_to_extract_;
+    //};
     
     struct Config {
         std::map<std::string, std::string> sensors_rule_to_name_;
         std::map<std::string, Rule> rules_;
-        std::vector<Extractor> extractors_;
+        std::map<std::string, std::vector<std::string>> extractors_;
 
         void Clear() {
             sensors_rule_to_name_.clear();
@@ -176,10 +175,10 @@ private:
             }
 
             os << "extractors_:\n";
-            for (auto& extractor : extractors_) {
+            for (auto& [extractor_name, extractor_rules_to_extract_] : extractors_) {
                 
-                os << indent << "  " << extractor.name_ << ":\n";
-                for (auto& rule_to_extract : extractor.rules_to_extract_) {
+                os << indent << "  " << extractor_name << ":\n";
+                for (auto& rule_to_extract : extractor_rules_to_extract_) {
                     os << indent << "    " << rule_to_extract << "\n";
                 }
             }
@@ -243,9 +242,9 @@ private:
         return 0.0;
     }
 
-    std::string ValueToString(const std::variant<bool, float, SpeedValue>& value) const {
+    std::string ValueToString(const std::variant<bool, float, SpeedValue>& value, const std::string& true_name = "true", const std::string& false_name = "false") const {
         if (std::holds_alternative<bool>(value)) {
-            return std::get<bool>(value) ? "true" : "false";
+            return std::get<bool>(value) ? true_name : false_name;
         } 
         else if (std::holds_alternative<float>(value)) {
             return std::to_string(std::get<float>(value));
@@ -373,8 +372,7 @@ private:
         }
     }
     
-    void AnalyzeFile(const FileData& file_data, 
-                 std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
+    void AnalyzeFile(const FileData& file_data, std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
         const std::string& current_file = file_data.file_name_;
         
         for (const auto& sensor_data : file_data.sensors_) {
@@ -387,29 +385,66 @@ private:
             for (const auto& [property_name, property_value] : sensor_data.property_to_value_) {
                 auto& max_min = analysis_result.property_to_max_min_[property_name];
                 
-                // Обновляем максимум
+                // обновляем максимум
                 if (max_min.max_.actual_value_.index() == 0 || 
                     GetNumericValue(property_value) > GetNumericValue(max_min.max_.actual_value_)) {
                     max_min.max_.actual_value_ = property_value;
                     max_min.max_containing_file_ = current_file;
-                    max_min.max_.infile_property_value_ = ValueToString(property_value);
+                    // Не сохраняем строку здесь - сохраним при выводе
                 }
                 
-                // Обновляем минимум
+                // обновляем минимум
                 if (max_min.min_.actual_value_.index() == 0 || 
                     GetNumericValue(property_value) < GetNumericValue(max_min.min_.actual_value_)) {
                     max_min.min_.actual_value_ = property_value;
                     max_min.min_containing_file_ = current_file;
-                    max_min.min_.infile_property_value_ = ValueToString(property_value);
+                    // Не сохраняем строку здесь - сохраним при выводе
                 }
             }
         }
     }
     
     void Analyze(std::ostream& os = std::cout) {
+        os << "================== ANALYSIS RESULTS ==============\n";
         std::map<std::string, SensorAnalysisResult> sensor_to_analysis_result;
+
+        // собираем данные со всех файлов
         for (const auto& file_data : file_data_list_) {
             AnalyzeFile(file_data, sensor_to_analysis_result);
+        }
+
+        if (sensor_to_analysis_result.empty()) {
+            os << "No data found.\n";
+            return;
+        }
+
+        for (const auto& [sensor_name, result] : sensor_to_analysis_result) {
+            os << result.output_sensor_name_ << ":\n";
+            std::vector<std::string>& rules_to_extract_ = config_.extractors_[sensor_name];
+            for (const auto& rule_to_extract: rules_to_extract_) {
+                
+                const auto& max_min = sensor_to_analysis_result[sensor_name].property_to_max_min_[rule_to_extract];
+
+
+                os << "    " << rule_to_extract << ": ";
+                
+                // Выводим max
+                os << "max=" << max_min.max_.infile_property_value_;
+                if (!max_min.max_containing_file_.empty()) {
+                    os << "(" << max_min.max_containing_file_ << ")";
+                }
+                
+                os << ", ";
+                
+                // Выводим min
+                os << "min=" << max_min.min_.infile_property_value_;
+                if (!max_min.min_containing_file_.empty()) {
+                    os << "(" << max_min.min_containing_file_ << ")";
+                }
+                
+                os << "\n";
+            }
+            os << "\n";
         }
     }
 
@@ -497,12 +532,13 @@ public:
         }
 
         for (auto& extractor : data["extractors"]) {
-            Extractor new_extractor;
-            new_extractor.name_ = extractor["sensor"];
+            std::vector<std::string> new_extractor;
+            
             for (auto& rule_name : extractor["rules"]) {
-                new_extractor.rules_to_extract_.push_back(rule_name);
+                new_extractor.push_back(rule_name);
             }
-            config_.extractors_.push_back(std::move(new_extractor));
+
+            config_.extractors_[extractor["sensor"]] = (std::move(new_extractor));
         }
 
 
