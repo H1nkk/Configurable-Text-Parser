@@ -7,10 +7,6 @@ project(ConfigurableTextParser VERSION 1.0.0 LANGUAGES CXX)
 # Устанавливаем стандарт C++
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Включаем экспериментальную поддержку модулей
-# set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 # Устанавливаем пути для включаемых файлов (аналог -I)
 set(INCLUDES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/includes)
@@ -61,7 +57,7 @@ set_target_properties(${EXECUTABLE_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_CURRENT_SOURCE_DIR}/bin
 )
 
-# Выводим информацию о путях (полезно для отладки)
+# Выводим информацию о путях
 message(STATUS "Project: ${PROJECT_NAME}")
 message(STATUS "Executable target: ${EXECUTABLE_NAME}")
 message(STATUS "Source dir: ${CMAKE_CURRENT_SOURCE_DIR}")

@@ -511,4 +511,3 @@ void Parser::Run(std::string path_to_files, std::ostream& os, bool parallel_mode
         std::cerr << e.what() << '\n';
     }
 }
-

@@ -11,14 +11,6 @@
 #include <sstream>
 using json = nlohmann::json;
 
-// TODO: глобально:
-// дописать Analyze() +
-// распараллелить +
-// разобраться с cmake ?
-// написать генератор анализируемых файлов +
-// сделать docker +
-// todo-шки в файлах +
-
 class Parser {
 private:
 
@@ -117,7 +109,7 @@ public:
 
     std::string ValueToString(const std::variant<bool, float, SpeedValue>& value, 
         const std::string& true_name = "true", const std::string& false_name = "false") const;
-        // TODO чекнуть параметры у которых есть значение по умолчанию - может их в .cpp написать?
+        // TODO чекнуть параметры у которых есть значение по умолчанию - можно их в .cpp написать?
 
     FileData ParseFile(const std::filesystem::path& path_to_file);
     void ParseParallel(const std::string& path_to_files);

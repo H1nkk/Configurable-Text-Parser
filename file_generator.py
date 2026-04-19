@@ -22,7 +22,7 @@ def write_text_to_file(file_path, sensors_count):
    
 
 def write_config_to_file(file_path, sensors_count):
-    # Создаем список sensors
+    # создаем список sensors
     sensors_list = []
     for i in range(1, sensors_count + 1):
         sensors_list.append({
@@ -30,7 +30,7 @@ def write_config_to_file(file_path, sensors_count):
             "rule": f"Датчик {i}"
         })
     
-    # Создаем список rules (фиксированный)
+    # создаем список rules (фиксированный)
     rules_list = [
         {
             "name": "state",
@@ -51,10 +51,9 @@ def write_config_to_file(file_path, sensors_count):
         }
     ]
     
-    # Создаем список extractors
     extractors_list = []
     for i in range(1, sensors_count + 1):
-        # Чередуем правила для разных датчиков
+        # чередуем правила для разных датчиков
         if i % 3 == 1:
             rules = ["temp", "speed"]
         elif i % 3 == 2:
@@ -67,21 +66,20 @@ def write_config_to_file(file_path, sensors_count):
             "rules": rules
         })
     
-    # Формируем итоговый JSON
+    # итоговый JSON
     config_data = {
         "sensors": sensors_list,
         "rules": rules_list,
         "extractors": extractors_list
     }
     
-    # Записываем в файл с отступами для читаемости
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
     
     print(f"Конфиг записан в {file_path}")
 
 if __name__ == "__main__":
-    # Проверяем количество аргументов
+    # проверяем количество аргументов
     if len(sys.argv) != 3:
         print("Ошибка: укажите число файлов и число датчиков")
         print(f"Использование: py {sys.argv[0]} <число_файлов> <число_датчиков>")
@@ -95,18 +93,18 @@ if __name__ == "__main__":
             print("Ошибка: числа должны быть положительными")
             sys.exit(1)
         
-        # Создаем папку если её нет
+        # создаем директорию если её нет
         os.makedirs("test/complex_test/sensor_data", exist_ok=True)
         os.makedirs("test/complex_test/configs", exist_ok=True)
 
-        # Генерируем файлы
+        # генерируем файлы
         for file_num in range(1, num_files + 1):
             file_path = f"test/complex_test/sensor_data/sensor_data_{file_num}.txt"
             write_text_to_file(file_path, sensors_per_file)
         
         print(f"\nСоздано {num_files} файлов, в каждом {sensors_per_file} датчиков")
         
-        # Генерируем конфиг
+        # генерируем конфиг
         file_path = f"test/complex_test/configs/config.json"
         write_config_to_file(file_path, sensors_per_file)
 
