@@ -354,10 +354,6 @@ private:
         return result;
     }
     void ParseParallel(const std::string& path_to_files) { // заполняет files_data
-        // тут можно сделать проверку, что есть хотя бы один файл для парсинга
-        // ещё сюда можно добавить параллельности 
-        // TODO сделать чтобы параллельность переключалась флагом --parallel
-
         std::filesystem::path test{path_to_files};
         std::vector<std::filesystem::path> files_to_process_list;
         
@@ -612,12 +608,17 @@ public:
     /// @param os поток для вывода результата анализа
     /// @param parallel_mode `true` - использовать параллельную версию парсинга, `false` - использовать непараллельную версию парсинга
     void Run(std::string path_to_files, std::ostream& os = std::cout, bool parallel_mode = false) {
-        if (parallel_mode) {
-            ParseParallel(path_to_files);
+        try {
+            if (parallel_mode) {
+                ParseParallel(path_to_files);
+            }
+            else {
+                ParseNonParallel(path_to_files);
+            }
+            Analyze(os);
         }
-        else {
-            ParseNonParallel(path_to_files);
+        catch (std::exception& e) {
+            std::cerr << e.what() << '\n';
         }
-        Analyze(os);
     }
 };
