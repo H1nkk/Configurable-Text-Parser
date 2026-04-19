@@ -55,6 +55,14 @@ private:
             return properties_[propetry_name];
         }
 
+        const std::string& operator[](const std::string& property_name) const {
+        static const std::string empty;
+        auto it = properties_.find(property_name);
+        if (it != properties_.end()) {
+            return it->second;
+        }
+        return empty;  // или throw std::out_of_range
+    }
 
         friend std::ostream& operator<<(std::ostream& os, const Rule& rule) {
             for (auto& [key, value] : rule.properties_) {
@@ -197,6 +205,7 @@ private:
         SensorPropertyValue max_;
         std::string min_containing_file_;
         SensorPropertyValue min_;
+        bool initialized_ = false;
 
         SensorMaxMinValues() = default;
     };
@@ -384,21 +393,26 @@ private:
             
             for (const auto& [property_name, property_value] : sensor_data.property_to_value_) {
                 auto& max_min = analysis_result.property_to_max_min_[property_name];
-                
-                // обновляем максимум
-                if (max_min.max_.actual_value_.index() == 0 || 
-                    GetNumericValue(property_value) > GetNumericValue(max_min.max_.actual_value_)) {
+
+                if (!max_min.initialized_) {
+                    max_min.initialized_ = true;
                     max_min.max_.actual_value_ = property_value;
                     max_min.max_containing_file_ = current_file;
-                    // Не сохраняем строку здесь - сохраним при выводе
-                }
-                
-                // обновляем минимум
-                if (max_min.min_.actual_value_.index() == 0 || 
-                    GetNumericValue(property_value) < GetNumericValue(max_min.min_.actual_value_)) {
                     max_min.min_.actual_value_ = property_value;
                     max_min.min_containing_file_ = current_file;
-                    // Не сохраняем строку здесь - сохраним при выводе
+                    continue;
+                }
+
+                // Сравниваем с текущим max
+                if (GetNumericValue(property_value) > GetNumericValue(max_min.max_.actual_value_)) {
+                    max_min.max_.actual_value_ = property_value;
+                    max_min.max_containing_file_ = current_file;
+                }
+
+                // Сравниваем с текущим min
+                if (GetNumericValue(property_value) < GetNumericValue(max_min.min_.actual_value_)) {
+                    max_min.min_.actual_value_ = property_value;
+                    max_min.min_containing_file_ = current_file;
                 }
             }
         }
@@ -420,16 +434,44 @@ private:
 
         for (const auto& [sensor_name, result] : sensor_to_analysis_result) {
             os << result.output_sensor_name_ << ":\n";
-            std::vector<std::string>& rules_to_extract_ = config_.extractors_[sensor_name];
-            for (const auto& rule_to_extract: rules_to_extract_) {
+            
+            // Получаем список правил для текущего сенсора
+            auto it = config_.extractors_.find(sensor_name);
+            if (it == config_.extractors_.end()) {
+                continue;
+            }
+            
+            for (const auto& rule_name : it->second) {
+                // Находим правило в конфиге
+                auto rule_it = config_.rules_.find(rule_name);
+                if (rule_it == config_.rules_.end()) {
+                    continue;
+                }
                 
-                const auto& max_min = sensor_to_analysis_result[sensor_name].property_to_max_min_[rule_to_extract];
-
-
-                os << "    " << rule_to_extract << ": ";
+                const auto& rule = rule_it->second;
+                
+                // Проверяем, есть ли это свойство в результате
+                auto prop_it = result.property_to_max_min_.find(rule_name);
+                if (prop_it == result.property_to_max_min_.end()) {
+                    continue;
+                }
+                
+                const auto& max_min = prop_it->second;
+                
+                // Получаем true/false названия для bool правил
+                std::string true_name = "true";
+                std::string false_name = "false";
+                
+                // Используем operator[] вместо at()
+                if (rule["type"] == "bool") {
+                    true_name = rule["true"];    // operator[] вернет ссылку на строку
+                    false_name = rule["false"];
+                }
+                
+                os << "    " << rule_name << ": ";
                 
                 // Выводим max
-                os << "max=" << max_min.max_.infile_property_value_;
+                os << "max=" << ValueToString(max_min.max_.actual_value_, true_name, false_name);
                 if (!max_min.max_containing_file_.empty()) {
                     os << "(" << max_min.max_containing_file_ << ")";
                 }
@@ -437,7 +479,7 @@ private:
                 os << ", ";
                 
                 // Выводим min
-                os << "min=" << max_min.min_.infile_property_value_;
+                os << "min=" << ValueToString(max_min.min_.actual_value_, true_name, false_name);
                 if (!max_min.min_containing_file_.empty()) {
                     os << "(" << max_min.min_containing_file_ << ")";
                 }
