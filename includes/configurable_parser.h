@@ -19,9 +19,7 @@ using json = nlohmann::json;
 // сделать docker
 // todo-шки в файлах
 
-// TODO: добавить всякие проверки в Parser::Configure
 // TODO: заменить map на unordered_map где нужно
-// TODO: сделать проверку что нет rule с одинаковым именем в json-файле
 
 class Parser {
 private:
@@ -42,9 +40,9 @@ private:
     };
 
     struct Rule {
+private:
         std::map<std::string, std::string> properties_;
-
-        // TODO посмотреть: раньше это было в public, а properties_ - в private. странное решение 
+public:
         std::string& operator[](const std::string& propetry_name) {
             return properties_[propetry_name];
         }
@@ -55,7 +53,7 @@ private:
         if (it != properties_.end()) {
             return it->second;
         }
-        return empty;  // или throw std::out_of_range
+        return empty;
     }
 
         friend std::ostream& operator<<(std::ostream& os, const Rule& rule) {
@@ -76,7 +74,6 @@ private:
                 if (match[1] == rule["true"]) {
                     property_to_value_[rule_name] = true;
                 } else { 
-                    // тут (match[1] == rule["false"])
                     property_to_value_[rule_name] = false;
                 }
             } else if (rule_type == "value") {
@@ -90,9 +87,6 @@ private:
                         // создаем SpeedValue и кладём в variant
                         SpeedValue speed(value, unit);
                         property_to_value_[rule_name] = speed;
-                        
-                        // std::cout << "  Скорость: " << speed.value << " " << speed.unit 
-                        //        << " (" << speed.value_in_mbit << " Mbit/s)" << std::endl;
                     } catch (const std::exception& e) {
                         std::cerr << "Ошибка парсинга скорости: " << e.what() << std::endl;
                     }
@@ -146,12 +140,6 @@ private:
             }
         }
     };
-
-
-
-    //struct Extractor {
-    //    std::vector<std::string> rules_to_extract_;
-    //};
     
     struct Config {
         std::map<std::string, std::string> sensors_rule_to_name_;
@@ -251,7 +239,7 @@ private:
         std::string file_name = path_to_file.filename().string();
         std::ifstream data_file_ifstream(path_to_file);
         if (!data_file_ifstream.is_open()) {
-            throw std::runtime_error("Couldn't open " + path_to_file.string() + " file."); // TODO обернуть в красивый тип исключения
+            throw std::runtime_error("Couldn't open " + path_to_file.string() + " file.");
         }
 
         std::string line = "";
@@ -288,10 +276,8 @@ private:
                 continue;
             }
 
-
             // проверяем, не начался ли другой датчик
             if (config_.sensors_rule_to_name_.find(line.substr(0, line.size() - 1)) != config_.sensors_rule_to_name_.end()) {
-                // line - имя датчика
                 std::string sensor_name = line;
 
                 if (!sensor_name.empty() && sensor_name.back() == ':') {
@@ -302,9 +288,6 @@ private:
                 is_sensor_seen = false;
                 continue;
             }
-
-            // std::cout << "line: " << line << " datchik: " << current_infile_sensor_name << '\n';
-
 
             // проверяем на соответствие 
             std::string regex_pattern;
@@ -332,7 +315,6 @@ private:
                         sensors.push_back(sensor_data);
                     }
                     is_sensor_seen = true;
-                    // ++line_number;
                     matched = true;
                     break;
                 }
@@ -373,17 +355,9 @@ private:
         for (int i = 0; i < files_to_process_count; i++) {
             file_data_list_[i] = ParseFile(files_to_process_list[i]);
         }
-
-        //std::cout<<"###\n";
-        //for (auto x : file_data_list_) {
-            //x.Dump();
-        //}
     }
 
     void ParseNonParallel(const std::string& path_to_files) { // заполняет files_data
-        // тут можно сделать проверку, что есть хотя бы один файл для парсинга
-        // ещё сюда можно добавить параллельности 
-        // TODO сделать чтобы параллельность переключалась флагом --parallel
         std::filesystem::path test{path_to_files};
         for (auto const& dir_entry : std::filesystem::directory_iterator{test}) {
             if (dir_entry.is_regular_file()) {
@@ -393,10 +367,6 @@ private:
                 }
             }
         }
-
-        //for (auto x : file_data_list_) {
-        //    x.Dump();
-        //}
     }
     
     void AnalyzeFile(const FileData& file_data, std::map<std::string, SensorAnalysisResult>& sensor_to_analysis_result) {
@@ -421,13 +391,13 @@ private:
                     continue;
                 }
 
-                // Сравниваем с текущим max
+                // сравниваем с текущим max
                 if (GetNumericValue(property_value) > GetNumericValue(max_min.max_.actual_value_)) {
                     max_min.max_.actual_value_ = property_value;
                     max_min.max_containing_file_ = current_file;
                 }
 
-                // Сравниваем с текущим min
+                // сравниваем с текущим min
                 if (GetNumericValue(property_value) < GetNumericValue(max_min.min_.actual_value_)) {
                     max_min.min_.actual_value_ = property_value;
                     max_min.min_containing_file_ = current_file;
@@ -452,14 +422,14 @@ private:
         for (const auto& [sensor_name, result] : sensor_to_analysis_result) {
             os << result.output_sensor_name_ << ":\n";
             
-            // Получаем список правил для текущего сенсора
+            // получаем список правил для текущего сенсора
             auto it = config_.extractors_.find(sensor_name);
             if (it == config_.extractors_.end()) {
                 continue;
             }
             
             for (const auto& rule_name : it->second) {
-                // Находим правило в конфиге
+                // находим правило в конфиге
                 auto rule_it = config_.rules_.find(rule_name);
                 if (rule_it == config_.rules_.end()) {
                     continue;
@@ -467,7 +437,7 @@ private:
                 
                 const auto& rule = rule_it->second;
                 
-                // Проверяем, есть ли это свойство в результате
+                // проверяем, есть ли это свойство в результате
                 auto prop_it = result.property_to_max_min_.find(rule_name);
                 if (prop_it == result.property_to_max_min_.end()) {
                     continue;
@@ -475,7 +445,7 @@ private:
                 
                 const auto& max_min = prop_it->second;
                 
-                // Меняем вывод для bool значений 
+                // меняем вывод для bool значений 
                 std::string true_name = "true";
                 std::string false_name = "false";
 
@@ -521,11 +491,17 @@ public:
         json data = json::parse(config_file_ifstream);
 
         for (auto& sensor : data["sensors"]) {
-            // std::cout << sensor["rule"] << ": " << sensor["name"] << '\n';
             config_.sensors_rule_to_name_[sensor["rule"]] = sensor["name"];
         }
 
         for (auto& rule : data["rules"]) {
+            std::string rule_name = rule["name"];
+    
+            // проверка на дубликат
+            if (config_.rules_.find(rule_name) != config_.rules_.end()) {
+                throw std::runtime_error("Duplicate rule name in config: \"" + rule_name + "\"");
+            }
+
             auto& properties = config_.rules_[rule["name"]];
             for (auto& property : rule.items()) {
                 if (property.key() == "name") {
@@ -548,7 +524,6 @@ public:
                 regexpr_pattern += ")";
 
                 regexpr_pattern += initial_string.substr(template_marker_pos + 4); // 4 это длина строки "(.*)"
-                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
             else if (rule_type == "value") {
@@ -556,10 +531,9 @@ public:
                 size_t template_marker_pos = initial_string.find("(.*)");
                 std::string regexpr_pattern = initial_string.substr(0, template_marker_pos);
                 
-                regexpr_pattern += R"(([+-]?\d+(?:\.\d+)?))"; // TODO проверить, обязательно ли вообще R-строки юзать 
+                regexpr_pattern += R"(([+-]?\d+(?:\.\d+)?))";
 
                 regexpr_pattern += initial_string.substr(template_marker_pos + 4);
-                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
             else if (rule_type == "speed") {
@@ -581,10 +555,8 @@ public:
                 regexpr_pattern += ")";
 
                 regexpr_pattern += initial_string.substr(second_template_marker_pos + 4);
-                // std::cout << "получился regexpr: " << regexpr_pattern << '\n';
                 properties["rule"] = regexpr_pattern;
             }
-            // std::cout << "#####\n\n";
         }
 
         for (auto& extractor : data["extractors"]) {
@@ -598,8 +570,6 @@ public:
         }
 
 
-        //std::cout << "\nconfig.dump:\n";
-        //config_.Dump(std::cout);
         return true;
     }
 
