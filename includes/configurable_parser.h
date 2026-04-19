@@ -121,12 +121,9 @@ public:
 
     FileData ParseFile(const std::filesystem::path& path_to_file);
     void ParseParallel(const std::string& path_to_files);
-        
-
     void ParseNonParallel(const std::string& path_to_files);
     
-    void AnalyzeFile(const FileData& file_data, std::unordered_map<std::string,
-        SensorAnalysisResult>& sensor_to_analysis_result);
+    void AnalyzeFile(const FileData& file_data, std::unordered_map<std::string, SensorAnalysisResult>& sensor_to_analysis_result);
     void Analyze(std::ostream& os = std::cout);
 
 public:
