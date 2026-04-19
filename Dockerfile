@@ -2,14 +2,14 @@ FROM gcc:latest
 
 WORKDIR /app
 
-# install dependencies
+# установка зависимостей
 RUN apt-get update && apt-get install -y cmake 
 
-# copy source
+# копируем содержимое проекта с хоста в контейнер
 COPY . .
 
-# build
+# собираем проект
 RUN cmake -B build && cmake --build build
 
-# run
+# docker run запускает это
 CMD ["./bin/parser", "--config", "test/example_test/configs/example.json", "--data", "test/example_test/sensor_data/"]
