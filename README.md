@@ -1,4 +1,4 @@
-# Configurable-Text-Parser
+# Configurable text parser
 
 ## Запуск в Docker
 
@@ -51,6 +51,72 @@ python3 .\file_generator.py 1000 4
 ```bash
 # Пример:
 ./bin/parser -h
+```
+
+## Пример вывода
+Для следующей конфигурации:
+```json
+{
+    "sensors" : [
+        { "name" : "sensor1", "rule" : "Датчик 1" },
+        { "name" : "sensor2", "rule" : "Датчик 2" }
+    ],
+
+    "rules" : [
+        { "name" : "state", "type" : "bool",  "rule" : "Состояние: (.*)", "true" : "включен", "false" : "выключен" },
+        { "name" : "temp",  "type" : "value", "rule" : "Температура: (.*)" },
+        { "name" : "speed", "type" : "speed", "rule" : "Скорость: (.*) (.*)/s" }
+    ],
+
+    "extractors" : [
+        { "sensor" : "sensor1", "rules" : [ "temp", "speed" ] },
+        { "sensor" : "sensor2", "rules" : [ "state", "speed" ] }
+    ]
+}
+```
+
+И следующих файлов:
+```text
+file1.txt
+// Показания датчика 1
+    Датчик 1: 
+        Состояние: включен // комментарий, не влияет на парсинг
+        Температура: 36.6
+        Скорость: 765 Mbit/s
+
+    // Показания датчика 2
+    Датчик 2:
+        Состояние: выключен
+        Температура: 0ннн // тут опечатка
+        Скорость: 1.5 Kbit/s
+
+file2.txt
+// Показания датчика 1
+    Датчик 1:
+        Состояние: включен
+      Температура: 42
+        Скорость: 1.4 Gbit/s
+
+   // Показания датчика 2
+   Датчик 2:
+        Состояние: влкючен // тут опечатка
+        Температура: 37
+       Скорость: 0 bit/s
+```
+
+Программа выдаст следующий результат:
+```
+> ./bin/parser
+
+Parsing error at file test/example_test/sensor_data/file1.txt, line 10: Couldn't parse this line
+Parsing error at file test/example_test/sensor_data/file2.txt, line 9: Couldn't parse this line
+sensor1:
+  temp: max=42(file2.txt), min=36.6(file1.txt)
+  speed: max=1.4 Gbit/s(file2.txt), min=765 Mbit/s(file1.txt)
+
+sensor2:
+  state: max=выключен(file1.txt), min=выключен(file1.txt)
+  speed: max=1.5 Kbit/s(file1.txt), min=0 bit/s(file2.txt)
 ```
 
 ## Архитектура проекта
