@@ -106,7 +106,7 @@ file2.txt
 
 Программа выдаст следующий результат:
 ```
-> ./bin/parser
+> ./bin/parser --config test/example_test/configs/example.json --data test/example_test/sensor_data/
 
 Parsing error at file test/example_test/sensor_data/file1.txt, line 10: Couldn't parse this line
 Parsing error at file test/example_test/sensor_data/file2.txt, line 9: Couldn't parse this line
